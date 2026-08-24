@@ -23,7 +23,6 @@ type Meta struct {
 	notifier *notify.Notifier
 	versions map[string][]*model.Version
 	current  map[string]int
-	parseRev map[string]int
 }
 
 // New creates a version manager bound to a catalog and a notifier.
@@ -33,7 +32,6 @@ func New(c *catalog.Catalog, n *notify.Notifier) *Meta {
 		notifier: n,
 		versions: make(map[string][]*model.Version),
 		current:  make(map[string]int),
-		parseRev: make(map[string]int),
 	}
 }
 
@@ -47,22 +45,14 @@ func (m *Meta) ApplySchema(tableID string, schema model.Schema) error {
 	return m.catalog.ApplySchemaAtomic(tableID, schema.Fields)
 }
 
-// Parse resolves the schema of the first version that was ever parsed for the
-// table. Later publishes do not invalidate the cached parse revision.
+// Parse resolves the schema of the currently active version of a table. Each
+// call re-reads the current version, so a freshly published version is used
+// immediately and new columns are visible without a restart or cache flush.
 func (m *Meta) Parse(tableID string) (*model.Schema, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	number, ok := m.parseRev[tableID]
-	if !ok {
-		version := m.resolveCurrent(tableID)
-		if version == nil {
-			return nil, ErrVersionUnavailable
-		}
-		number = version.Number
-		m.parseRev[tableID] = number
-	}
-	version := m.find(tableID, number)
-	if version == nil {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	version := m.resolveCurrent(tableID)
+	if version == nil || !version.IsReadable() {
 		return nil, ErrVersionUnavailable
 	}
 	next := version.Schema.Clone()
