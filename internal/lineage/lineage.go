@@ -34,8 +34,8 @@ func New() *Graph {
 }
 
 // AddEdge records a dependency from one table to another. The cycle check runs
-// against the graph snapshot captured before the new edge is applied, so a
-// cycle formed by the new edge itself is not detected.
+// against the latest adjacency plus the proposed edge, so any cycle closed by
+// the new edge itself is detected and rejected before the graph is mutated.
 func (g *Graph) AddEdge(from, to, reason string) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -55,20 +55,19 @@ func (g *Graph) AddEdge(from, to, reason string) error {
 		Reason: reason,
 	}
 	key := edge.Key()
-	before := g.adjacencyCopy()
 	if _, exists := g.edges[key]; exists {
 		g.edges[key] = edge
 		return nil
 	}
+	// Reject before mutating if the edge would close a directed cycle. The
+	// check runs against the live adjacency plus the proposed edge, so a cycle
+	// formed by the new edge itself is caught, not only pre-existing ones.
+	if WouldCreateCycle(g.adjacencyCopy(), from, to) {
+		return ErrCycle
+	}
 	g.edges[key] = edge
 	g.out[from] = append(g.out[from], to)
 	g.in[to] = append(g.in[to], from)
-	if HasCycle(before) {
-		delete(g.edges, key)
-		g.out[from] = removeValue(g.out[from], to)
-		g.in[to] = removeValue(g.in[to], from)
-		return ErrCycle
-	}
 	return nil
 }
 
