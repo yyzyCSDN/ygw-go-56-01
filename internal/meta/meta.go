@@ -35,25 +35,12 @@ func New(c *catalog.Catalog, n *notify.Notifier) *Meta {
 	}
 }
 
-// ApplySchema applies a schema update to an existing catalog table by merging
-// the incoming fields into the current field list positionally.
+// ApplySchema replaces the field list of an existing catalog table with one
+// complete schema snapshot. The new table is built and swapped into the store
+// under a single catalog lock, so a concurrent catalog query observes either
+// the entire old schema or the entire new schema, never a mix of the two.
 func (m *Meta) ApplySchema(tableID string, schema model.Schema) error {
-	if !m.catalog.HasTable(tableID) {
-		return catalog.ErrNotFound
-	}
-	current, err := m.catalog.Get(tableID)
-	if err != nil {
-		return err
-	}
-	merged := append([]model.Field(nil), current.Fields...)
-	for i, field := range schema.Fields {
-		if i < len(merged) {
-			merged[i] = field
-		} else {
-			merged = append(merged, field)
-		}
-	}
-	return m.catalog.Replace(current.WithSchema(merged))
+	return m.catalog.ApplySchemaAtomic(tableID, schema.Fields)
 }
 
 // Parse resolves the schema of the currently published version of a table.
