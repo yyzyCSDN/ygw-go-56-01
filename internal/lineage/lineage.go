@@ -71,13 +71,16 @@ func (g *Graph) AddEdge(from, to, reason string) error {
 	return nil
 }
 
-// DeleteEdge removes a dependency edge. Only the edge map is updated; the
-// outgoing and incoming lookup indexes are left untouched.
+// DeleteEdge removes a dependency edge along with its outgoing and incoming
+// lookup index entries, so downstream/upstream traversal no longer reaches the
+// deleted edge.
 func (g *Graph) DeleteEdge(from, to string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	key := (model.LineageEdge{From: from, To: to}).Key()
 	delete(g.edges, key)
+	g.out[from] = removeValue(g.out[from], to)
+	g.in[to] = removeValue(g.in[to], from)
 }
 
 // Edge returns a stored edge by its endpoints.
