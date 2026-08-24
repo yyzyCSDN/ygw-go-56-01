@@ -33,7 +33,8 @@ func (m *Meta) Draft(tableID string, schema model.Schema) (*model.Version, error
 }
 
 // Publish transitions the newest draft into the published state and notifies
-// subscribers. Notification failures are propagated to the caller.
+// subscribers. Notification failures are propagated to the caller so that a
+// permanently unreachable subscriber is reported rather than silently dropped.
 func (m *Meta) Publish(tableID string) (*model.Version, error) {
 	m.mu.Lock()
 	version := m.latestDraft(tableID)
@@ -50,8 +51,7 @@ func (m *Meta) Publish(tableID string) (*model.Version, error) {
 		Fields:  fieldNames(version.Schema.Fields),
 	}
 	m.mu.Unlock()
-	_ = m.notifier.Push(context.Background(), event)
-	return version.Clone(), nil
+	return version.Clone(), m.notifier.Push(context.Background(), event)
 }
 
 // Rollback moves the current published version to rolled-back and activates

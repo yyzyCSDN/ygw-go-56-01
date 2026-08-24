@@ -159,19 +159,25 @@ func (s *Server) handleEdges(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, err)
 			return
 		}
-		_ = s.notify.Push(context.Background(), model.ChangeEvent{
+		if err := s.notify.Push(context.Background(), model.ChangeEvent{
 			TableID: req.From,
 			Type:    model.EventLineageChanged,
-		})
+		}); err != nil {
+			writeError(w, http.StatusBadGateway, err)
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]string{"edge": req.From + "->" + req.To})
 	case http.MethodDelete:
 		from := r.URL.Query().Get("from")
 		to := r.URL.Query().Get("to")
 		s.lineage.DeleteEdge(from, to)
-		_ = s.notify.Push(context.Background(), model.ChangeEvent{
+		if err := s.notify.Push(context.Background(), model.ChangeEvent{
 			TableID: from,
 			Type:    model.EventLineageChanged,
-		})
+		}); err != nil {
+			writeError(w, http.StatusBadGateway, err)
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]string{"deleted": from + "->" + to})
 	default:
 		writeError(w, http.StatusMethodNotAllowed, errors.New("method not allowed"))
