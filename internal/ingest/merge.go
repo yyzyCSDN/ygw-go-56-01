@@ -3,10 +3,12 @@ package ingest
 import "catalogsvc/internal/model"
 
 // applyTable upserts one table from an import segment. Existing tables are
-// overwritten with the incoming field list.
+// merged with the incoming field list so only the columns present upstream are
+// overwritten; manually cataloged columns are preserved across upstream schema
+// changes.
 func (im *Importer) applyTable(table model.Table) error {
 	if im.catalog.HasTable(table.ID) {
-		return im.catalog.ApplyIncoming(table.ID, table.Fields, false)
+		return im.catalog.ApplyIncoming(table.ID, table.Fields, true)
 	}
 	return im.catalog.Register(&table)
 }

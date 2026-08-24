@@ -17,14 +17,23 @@ func OverwriteFields(local, incoming []model.Field) []model.Field {
 	return next
 }
 
-// ApplyIncoming updates the stored table by overwriting its field list with
-// the incoming import fields.
+// ApplyIncoming updates the stored table by merging its field list with the
+// incoming import fields. When preserveLocal is true, only the columns present
+// in the incoming snapshot are overwritten; fields that exist only locally
+// (such as manually cataloged columns) are kept so a sync never erases them.
+// Incoming definitions still win on name collisions. When preserveLocal is
+// false, the local field list is replaced wholesale with the incoming fields.
 func (c *Catalog) ApplyIncoming(id string, incoming []model.Field, preserveLocal bool) error {
 	current, err := c.Get(id)
 	if err != nil {
 		return err
 	}
-	merged := OverwriteFields(current.Fields, incoming)
+	var merged []model.Field
+	if preserveLocal {
+		merged = MergeFields(current.Fields, incoming)
+	} else {
+		merged = OverwriteFields(current.Fields, incoming)
+	}
 	next := current.WithSchema(merged)
 	return c.Replace(next)
 }
