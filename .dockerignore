@@ -1,0 +1,14 @@
+.git
+.git/**
+.claude
+.claude/**
+.verification-cache
+evidence
+private_oracles
+gocache
+gomodcache
+runner
+verify-workspaces
+*.jsonl
+*.log
+*.zip
