@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>CatalogSvc 数据目录</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+    th { background: #f5f5f5; }
+    .badge { background: #e8f4fd; border-radius: 4px; padding: 0.1rem 0.4rem; }
+  </style>
+</head>
+<body>
+  <h1>数据目录与血缘服务</h1>
+  <p id="status">加载中...</p>
+  <table id="tables">
+    <thead><tr><th>表 ID</th><th>名称</th><th>Schema</th><th>Owner</th><th>字段数</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <script>
+    async function loadTables() {
+      const status = document.getElementById('status');
+      const body = document.querySelector('#tables tbody');
+      try {
+        const resp = await fetch('/api/tables');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const tables = await resp.json();
+        status.textContent = '共 ' + tables.length + ' 张表';
+        body.innerHTML = '';
+        for (const t of tables) {
+          const row = document.createElement('tr');
+          row.innerHTML = '<td>' + t.ID + '</td><td>' + t.Name + '</td><td>' +
+            '<span class="badge">' + t.Schema + '</span></td><td>' + t.Owner +
+            '</td><td>' + (t.Fields ? t.Fields.length : 0) + '</td>';
+          body.appendChild(row);
+        }
+      } catch (err) {
+        status.textContent = '加载失败: ' + err.message;
+      }
+    }
+    loadTables();
+  </script>
+</body>
+</html>
